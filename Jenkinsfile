@@ -5,8 +5,6 @@ pipeline {
         APP_DIR       = "/opt/kidney-disease-streamlit"
         VENV_DIR      = "${APP_DIR}/venv"
         APP_PORT      = "8501"
-        PID_FILE      = "${APP_DIR}/streamlit.pid"
-        LOG_FILE      = "${APP_DIR}/streamlit.log"
     }
 
     stages {
@@ -15,13 +13,6 @@ pipeline {
             steps {
                 echo '📥 Checking out source code...'
                 checkout scm
-            }
-        }
-
-        stage('Whoami Check') {
-            steps {
-                sh 'whoami'
-                sh 'id'
             }
         }
 
@@ -61,40 +52,13 @@ pipeline {
             }
         }
 
-        stage('Stop Existing App') {
-            steps {
-                echo '🛑 Stopping any existing running app...'
-                sh '''
-                    if [ -f ${PID_FILE} ]; then
-                        OLD_PID=$(cat ${PID_FILE})
-                        if ps -p $OLD_PID > /dev/null 2>&1; then
-                            kill $OLD_PID
-                            sleep 2
-                            echo "Old process $OLD_PID stopped"
-                        fi
-                        rm -f ${PID_FILE}
-                    fi
-                    fuser -k ${APP_PORT}/tcp || true
-                '''
-            }
-        }
-
         stage('Deploy') {
             steps {
-                echo '🚀 Starting Streamlit application...'
+                echo '🚀 Restarting Streamlit via systemd...'
                 sh '''
-                    cd ${APP_DIR}
-                    . venv/bin/activate
-
-                    nohup streamlit run app.py \
-                        --server.address=0.0.0.0 \
-                        --server.port=${APP_PORT} \
-                        --server.headless=true \
-                        > ${LOG_FILE} 2>&1 &
-
-                    echo $! > ${PID_FILE}
-                    sleep 3
-                    echo "Started with PID $(cat ${PID_FILE})"
+                    sudo systemctl restart kidney-streamlit
+                    sleep 5
+                    sudo systemctl is-active kidney-streamlit
                 '''
             }
         }
@@ -103,7 +67,7 @@ pipeline {
             steps {
                 echo '❤️ Checking Streamlit application...'
                 sh '''
-                    sleep 8
+                    sleep 5
                     curl -f http://localhost:${APP_PORT}/_stcore/health
                     echo ""
                     echo "✅ Streamlit application is running!"
@@ -118,7 +82,7 @@ pipeline {
         }
         failure {
             echo 'PIPELINE FAILED — check console output'
-            sh 'cat ${LOG_FILE} || true'
+            sh 'sudo journalctl -u kidney-streamlit -n 50 --no-pager || true'
         }
     }
 }
