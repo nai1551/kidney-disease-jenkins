@@ -1,9 +1,10 @@
 streamlit
 pandas
 numpy
-matplotlib
 scikit-learn
-xgboost
-imbalanced-learn
+matplotlib
+seaborn
 shap
 lime
+xgboost
+imbalanced-learn
