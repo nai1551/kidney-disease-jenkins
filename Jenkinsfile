@@ -18,6 +18,13 @@ pipeline {
             }
         }
 
+        stage('Whoami Check') {
+            steps {
+                sh 'whoami'
+                sh 'id'
+            }
+        }
+
         stage('Prepare App Directory') {
             steps {
                 echo '📁 Preparing deployment directory...'
