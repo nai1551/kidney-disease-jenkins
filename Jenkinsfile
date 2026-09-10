@@ -2,9 +2,10 @@ pipeline {
     agent any
 
     environment {
-        APP_DIR       = "/opt/kidney-disease-streamlit"
+        APP_DIR       = "/opt/kidney-disease-jenkins"
         VENV_DIR      = "${APP_DIR}/venv"
-        APP_PORT      = "8501"
+        APP_PORT      = "8502"
+        SERVICE_NAME  = "kidney-streamlit-jenkins"
     }
 
     stages {
@@ -66,9 +67,9 @@ pipeline {
             steps {
                 echo '🚀 Restarting Streamlit via systemd...'
                 sh '''
-                    sudo systemctl restart kidney-streamlit
+                    sudo systemctl restart ${SERVICE_NAME}
                     sleep 5
-                    sudo systemctl is-active kidney-streamlit
+                    sudo systemctl is-active ${SERVICE_NAME}
                 '''
             }
         }
@@ -92,7 +93,7 @@ pipeline {
         }
         failure {
             echo 'PIPELINE FAILED — check console output'
-            sh 'sudo journalctl -u kidney-streamlit -n 50 --no-pager || true'
+            sh 'sudo journalctl -u ${SERVICE_NAME} -n 50 --no-pager || true'
         }
     }
 }
