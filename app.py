@@ -6,9 +6,9 @@ metadata.pkl) produced by the training script instead of retraining on every run
 """
 
 import os
-import pickle
 import warnings
 
+import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -42,14 +42,12 @@ def load_artifacts():
     if missing:
         return None
 
-    with open(BEST_MODEL_PATH, "rb") as f:
-        best_model = pickle.load(f)
-    with open(SCALER_PATH, "rb") as f:
-        scaler = pickle.load(f)
-    with open(ENCODERS_PATH, "rb") as f:
-        label_encoders = pickle.load(f)
-    with open(METADATA_PATH, "rb") as f:
-        metadata = pickle.load(f)
+    # joblib.load transparently handles both compressed (best_model.pkl)
+    # and plain-pickle (scaler/label_encoders/metadata) files.
+    best_model = joblib.load(BEST_MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+    label_encoders = joblib.load(ENCODERS_PATH)
+    metadata = joblib.load(METADATA_PATH)
 
     return {
         "best_model": best_model,
