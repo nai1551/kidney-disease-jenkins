@@ -88,7 +88,7 @@ pipeline {
 
     post {
         success {
-            echo 'PIPELINE SUCCESSFUL - App running at http://<server-ip>:8501'
+            echo 'PIPELINE SUCCESSFUL - App running at http://<server-ip>:8502'
         }
         failure {
             echo 'PIPELINE FAILED — check console output'
