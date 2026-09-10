@@ -12,7 +12,8 @@ This is NOT a full unit test suite — it's a fast sanity check that:
 If this script exits non-zero, the GitHub Actions job fails, which is
 exactly the signal you want before anything reaches Jenkins.
 
-Run manually with: python tests/test_predict.py
+Run with pytest:  pytest tests/test_predict.py -v
+Run standalone:   python tests/test_predict.py
 """
 
 import sys
@@ -118,6 +119,11 @@ def run_smoke_test():
     assert all(0.0 <= p <= 1.0 for p in pred_proba), "Probability out of [0, 1] range"
 
     print("\n✅ Smoke test passed — model loads and predicts correctly.")
+
+
+def test_smoke():
+    """pytest entry point — pytest only auto-discovers functions named test_*"""
+    run_smoke_test()
 
 
 if __name__ == "__main__":
