@@ -1,0 +1,58 @@
+name: CI - Test Kidney Disease App
+
+# Runs automatically on every push and pull request to main.
+# You can also trigger it manually from the Actions tab (workflow_dispatch).
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Caches pip downloads between runs so installs are fast after the first time
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Syntax check app.py
+        run: python -m py_compile app.py
+
+      - name: Syntax check train_model.py
+        run: python -m py_compile train_model.py
+
+      - name: Check saved_models/ artifacts exist
+        run: |
+          test -f saved_models/best_model.pkl || (echo "::error::best_model.pkl missing" && exit 1)
+          test -f saved_models/scaler.pkl || (echo "::error::scaler.pkl missing" && exit 1)
+          test -f saved_models/label_encoders.pkl || (echo "::error::label_encoders.pkl missing" && exit 1)
+          test -f saved_models/metadata.pkl || (echo "::error::metadata.pkl missing" && exit 1)
+          echo "All model artifacts present."
+
+      - name: Run prediction smoke test
+        run: python tests/test_predict.py
+
+      - name: Summary
+        if: success()
+        run: echo "✅ All checks passed — safe to deploy via Jenkins."

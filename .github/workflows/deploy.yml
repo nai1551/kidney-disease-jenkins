@@ -1,0 +1,75 @@
+name: Deploy Streamlit App
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  APP_DIR: /opt/kidney-disease-streamlit
+  APP_PORT: 8501
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Syntax check
+        run: python -m py_compile app.py
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  deploy:
+    needs: test
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Show changes
+        run: |
+          chmod +x show_changes.sh
+          ./show_changes.sh
+
+      - name: Prepare app directory
+        run: |
+          mkdir -p ${{ env.APP_DIR }}
+          cp -r ./* ${{ env.APP_DIR }}/
+
+      - name: Python setup
+        run: |
+          cd ${{ env.APP_DIR }}
+          python3 --version
+          python3 -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restart service
+        run: |
+          sudo systemctl restart kidney-streamlit
+          sleep 5
+          sudo systemctl is-active kidney-streamlit
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f http://localhost:${{ env.APP_PORT }}/_stcore/health
+          echo "Streamlit application is running!"
+
+      - name: Show logs on failure
+        if: failure()
+        run: sudo journalctl -u kidney-streamlit -n 50 --no-pager || true
