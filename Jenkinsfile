@@ -16,6 +16,16 @@ pipeline {
             }
         }
 
+        stage('Show Changes') {
+            steps {
+                echo '🔍 Comparing with previous build...'
+                sh '''
+                    chmod +x show_changes.sh
+                    ./show_changes.sh
+                '''
+            }
+        }
+
         stage('Prepare App Directory') {
             steps {
                 echo '📁 Preparing deployment directory...'
