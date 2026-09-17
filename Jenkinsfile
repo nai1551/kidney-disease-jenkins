@@ -2,86 +2,68 @@ pipeline {
     agent any
 
     environment {
-        APP_DIR       = "/opt/kidney-disease-jenkins"
-        VENV_DIR      = "${APP_DIR}/venv"
-        APP_PORT      = "8502"
-        SERVICE_NAME  = "kidney-streamlit-jenkins"
+        IMAGE_REPO = "naim8855/kidney-disease-app"
+        IMAGE_TAG = "v${BUILD_NUMBER}"
+        CONTAINER_NAME = "kidney-container"
+        APP_PORT = "8501"
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                echo '📥 Checking out source code...'
                 checkout scm
             }
         }
 
-        stage('Show Changes') {
+        stage('Build Image') {
             steps {
-                echo '🔍 Comparing with previous build...'
                 sh '''
-                    chmod +x show_changes.sh
-                    ./show_changes.sh
+                    docker build -t $IMAGE_REPO:$IMAGE_TAG -t $IMAGE_REPO:latest .
                 '''
             }
         }
 
-        stage('Prepare App Directory') {
+        stage('Login to Docker Hub') {
             steps {
-                echo '📁 Preparing deployment directory...'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
                 sh '''
-                    mkdir -p ${APP_DIR}
-                    cp -r ./* ${APP_DIR}/
+                    docker push $IMAGE_REPO:$IMAGE_TAG
+                    docker push $IMAGE_REPO:latest
                 '''
             }
         }
 
-        stage('Python Setup') {
+        stage('Deploy App') {
             steps {
-                echo '🐍 Setting up Python environment...'
                 sh '''
-                    cd ${APP_DIR}
-                    python3 --version
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo '🧪 Running basic checks...'
-                sh '''
-                    cd ${APP_DIR}
-                    . venv/bin/activate
-                    python -m py_compile app.py
-                    echo "Python syntax check passed!"
-                '''
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo '🚀 Restarting Streamlit via systemd...'
-                sh '''
-                    sudo systemctl restart ${SERVICE_NAME}
-                    sleep 5
-                    sudo systemctl is-active ${SERVICE_NAME}
+                    docker rm -f $CONTAINER_NAME || true
+                    docker run -d \
+                      --name $CONTAINER_NAME \
+                      -p $APP_PORT:8501 \
+                      $IMAGE_REPO:$IMAGE_TAG
                 '''
             }
         }
 
         stage('Health Check') {
             steps {
-                echo '❤️ Checking Streamlit application...'
                 sh '''
-                    sleep 5
-                    curl -f http://localhost:${APP_PORT}/_stcore/health
+                    sleep 15
+                    curl -f http://localhost:$APP_PORT/_stcore/health
                     echo ""
-                    echo "✅ Streamlit application is running!"
+                    echo "Streamlit app is healthy and running."
                 '''
             }
         }
@@ -89,11 +71,14 @@ pipeline {
 
     post {
         success {
-            echo 'PIPELINE SUCCESSFUL - App running at http://<server-ip>:8502'
+            echo "Pipeline succeeded — deployed ${IMAGE_REPO}:${IMAGE_TAG} on port ${APP_PORT}"
         }
         failure {
-            echo 'PIPELINE FAILED — check console output'
-            sh 'sudo journalctl -u ${SERVICE_NAME} -n 50 --no-pager || true'
+            echo 'Pipeline failed — check the stage logs above.'
+            sh 'docker logs $CONTAINER_NAME --tail 50 || true'
+        }
+        always {
+            sh 'docker logout || true'
         }
     }
 }
